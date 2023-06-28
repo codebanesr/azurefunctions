@@ -16,26 +16,32 @@ const httpTrigger: AzureFunction = async function (
   try {
     // Connect to MongoDB
     await mongoose.connect(connectionString, {});
+    console.log({ message: "Connected to mongodb" });
 
     // Extract email data from the request body
-    const { message } = req.body;
+    const { message, subscription } = req.body as EmailWebhookPushPayload;
     const decodedData = Buffer.from(message.data, "base64").toString("utf-8");
-    const { email, messageId, publishTime } = JSON.parse(decodedData);
+
+    const { emailAddress, historyId } = JSON.parse(decodedData);
 
     // Retrieve access token from UserModel (replace with your actual UserModel code)
-    const user = await UserModel.findOne({ email });
+    const user = await UserModel.findOne({ email: emailAddress }).lean().exec();
     const { accessToken } = user;
 
     // Fetch email content using users.messages.get
-    const emailData = await getGmailMessages(accessToken, "me", messageId);
+    const emailData = await getGmailMessages(
+      accessToken,
+      "me",
+      historyId
+    );
 
     const category = await categorizeEmail(emailData); // Function to categorize the email
 
     // Store the email data in the database
     const newEmail = new EmailModel({
-      email,
-      messageId,
-      publishTime,
+      email: emailAddress,
+      messageId: message.messageId || message.message_id,
+      publishTime: message.publishTime || message.publish_time,
       message,
       category,
     });
@@ -58,8 +64,21 @@ const httpTrigger: AzureFunction = async function (
 
 // Function to categorize the email (modify this logic as per your categorization requirements)
 async function categorizeEmail(emailData: gmail_v1.Schema$Message) {
-  const category = await categorizeEmailAi(decode(emailData.payload.body.data));
+  const parts = emailData.payload.parts;
+  let data = "";
+  for (const part of parts) {
+    if (part.mimeType === "text/plain") {
+      if (part.body.data.includes("base64")) {
+        data += decode(part.body.data);
+      } else {
+        data += part.body.data;
+      }
+    } else if (part.mimeType === "application/octet-stream") {
+      data += decode(part.body.data.toString());
+    }
+  }
+
+  const category = await categorizeEmailAi(data);
   return category;
 }
-
 export default httpTrigger;

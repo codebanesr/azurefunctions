@@ -2,7 +2,7 @@ export interface EmailCategoryResponse {
   urgency: "low" | "medium" | "high";
   is_meeting_required: boolean;
   sentiment: "positive" | "negative" | "neutral";
-  category: "Announcements" | "Updates" | "Reminders" | "Requests" | "Other";
+  category: string[];
   recipient: string;
   attachments: boolean;
   priority: "low" | "normal" | "high";

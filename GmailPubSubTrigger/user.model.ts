@@ -19,4 +19,4 @@ const userSchema = new mongoose.Schema<User>({
 
 userSchema.index({ accessToken: 1, refreshToken: 1 }, { unique: true });
 
-export const UserModel = mongoose.model("User", userSchema);
+export const UserModel = mongoose.model("User", userSchema, "User");

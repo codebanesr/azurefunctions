@@ -23,7 +23,7 @@ const emailCategoryResponseSchema = new mongoose.Schema<EmailCategoryResponse>({
     required: true,
   },
   category: {
-    type: SchemaTypes.String,
+    type: [SchemaTypes.String],
     required: true,
   },
   recipient: {
