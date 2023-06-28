@@ -1,0 +1,2 @@
+More on what can be done with this cognitive service.
+https://portal.azure.com/#@rahmanshanur7gmail.onmicrosoft.com/resource/subscriptions/2a580a19-849c-47b4-ad00-c9fd9e6e39cf/resourceGroups/openai/providers/Microsoft.CognitiveServices/accounts/shanurrahman/cskeys
