@@ -29,13 +29,10 @@ const httpTrigger: AzureFunction = async function (
     const { accessToken } = user;
 
     // Fetch email content using users.messages.get
-    const emailData = await getGmailMessages(
-      accessToken,
-      "me",
-      historyId
-    );
+    const emailData = await getGmailMessages(accessToken, "me", historyId);
 
-    const category = await categorizeEmail(emailData); // Function to categorize the email
+    console.log({ email_payload: emailData.payload });
+    const category = await categorizeEmail(emailData, context); // Function to categorize the email
 
     // Store the email data in the database
     const newEmail = new EmailModel({
@@ -63,22 +60,75 @@ const httpTrigger: AzureFunction = async function (
 };
 
 // Function to categorize the email (modify this logic as per your categorization requirements)
-async function categorizeEmail(emailData: gmail_v1.Schema$Message) {
-  const parts = emailData.payload.parts;
+async function categorizeEmail(
+  emailData: gmail_v1.Schema$Message,
+  context: Context
+) {
+  const { body, parts } = emailData.payload || {};
   let data = "";
-  for (const part of parts) {
-    if (part.mimeType === "text/plain") {
-      if (part.body.data.includes("base64")) {
-        data += decode(part.body.data);
-      } else {
-        data += part.body.data;
+
+  const logError = (message: string) => {
+    context.log.error(message);
+    // You can customize the error handling logic here
+  };
+
+  const mimeHandlers = {
+    "text/plain": (part: any) => {
+      try {
+        if (part.body.data.includes("base64")) {
+          return decode(part.body.data);
+        } else {
+          return part.body.data;
+        }
+      } catch (error) {
+        logError("Error decoding text/plain part");
+        return "";
       }
-    } else if (part.mimeType === "application/octet-stream") {
-      data += decode(part.body.data.toString());
+    },
+    "application/octet-stream": (part: any) => {
+      try {
+        return decode(part.body.data.toString());
+      } catch (error) {
+        logError("Error decoding application/octet-stream part");
+        return "";
+      }
+    },
+  };
+
+  const processBody = (emailBody: any) => {
+    if (emailBody?.size > 0) {
+      try {
+        return decode(emailBody.data);
+      } catch (error) {
+        logError("Error decoding email body");
+        return "";
+      }
     }
+    return "";
+  };
+
+  const processPart = (part: any) => {
+    const handler = mimeHandlers[part.mimeType];
+    if (handler) {
+      return handler(part);
+    } else {
+      // Handle other mime types if necessary
+      return "";
+    }
+  };
+
+  if (body) {
+    data = processBody(body);
+  } else if (parts?.length > 0) {
+    for (const part of parts) {
+      data += processPart(part);
+    }
+  } else {
+    // Handle the case when both body and parts are missing or empty
   }
 
   const category = await categorizeEmailAi(data);
   return category;
 }
+
 export default httpTrigger;
