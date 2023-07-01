@@ -31,7 +31,6 @@ const httpTrigger: AzureFunction = async function (
     // Fetch email content using users.messages.get
     const emailData = await getGmailMessages(accessToken, "me", historyId);
 
-    console.log({ email_payload: emailData.payload });
     const category = await categorizeEmail(emailData, context); // Function to categorize the email
 
     // Store the email data in the database
@@ -64,8 +63,17 @@ async function categorizeEmail(
   emailData: gmail_v1.Schema$Message,
   context: Context
 ) {
-  const { body, parts } = emailData.payload || {};
+  const { body, parts, mimeType } = emailData.payload || {};
   let data = "";
+
+  if (mimeType === "text/html") {
+    context.res = {
+      status: 200,
+      body: "Cannot parse html content right now!",
+    };
+
+    return;
+  }
 
   const logError = (message: string) => {
     context.log.error(message);
@@ -75,23 +83,24 @@ async function categorizeEmail(
   const mimeHandlers = {
     "text/plain": (part: any) => {
       try {
-        if (part.body.data.includes("base64")) {
-          return decode(part.body.data);
-        } else {
-          return part.body.data;
-        }
+        return decode(part.body.data);
       } catch (error) {
         logError("Error decoding text/plain part");
         return "";
       }
     },
-    "application/octet-stream": (part: any) => {
+    "text/html": (part: any) => {
       try {
-        return decode(part.body.data.toString());
+        // will handle it later
+        return "";
+        // return decode(part.body.data);
       } catch (error) {
-        logError("Error decoding application/octet-stream part");
+        logError("Error decoding text/html part");
         return "";
       }
+    },
+    "application/octet-stream": (part: any) => {
+      return decode(part.body.data.toString());
     },
   };
 
@@ -117,7 +126,7 @@ async function categorizeEmail(
     }
   };
 
-  if (body) {
+  if (body.size > 0) {
     data = processBody(body);
   } else if (parts?.length > 0) {
     for (const part of parts) {
@@ -127,6 +136,11 @@ async function categorizeEmail(
     // Handle the case when both body and parts are missing or empty
   }
 
+  console.log({ data: JSON.stringify(data, null, 2) });
+
+  if (!data) {
+    return;
+  }
   const category = await categorizeEmailAi(data);
   return category;
 }
