@@ -6,6 +6,7 @@ import { categorizeEmailAi } from "./categorizeEmail";
 import { EmailModel } from "./email.model";
 import { getGmailMessages } from "./getGmailMessage";
 import { UserModel } from "./user.model";
+import { getAccessToken } from "./get-access-from-refresh-token";
 
 const connectionString = process.env.MONGO_URI;
 
@@ -26,14 +27,22 @@ const httpTrigger: AzureFunction = async function (
 
     // Retrieve access token from UserModel (replace with your actual UserModel code)
     const user = await UserModel.findOne({ email: emailAddress }).lean().exec();
-    const { accessToken } = user;
+    const { refreshToken } = user;
+    let { accessToken } = user;
+
+    accessToken =
+      (await getAccessTokenFromRefreshToken({
+        clientId: process.env.GOOGLE_ID,
+        clientSecret: process.env.GOOGLE_SECRET,
+        refreshToken,
+      })) || accessToken;
 
     // Fetch email content using users.messages.get
     const emailData = await getGmailMessages(accessToken, "me", historyId);
 
     const category = await categorizeEmail(emailData, context); // Function to categorize the email
 
-    if(!category) {
+    if (!category) {
       context.res = {
         status: 200,
         body: "This email lacks text body, it was not processed",
