@@ -6,14 +6,14 @@ interface RefreshTokenParams {
   clientSecret: string;
 }
 
-async function getAccessTokenFromRefreshToken(
+export async function getAccessTokenFromRefreshToken(
   params: RefreshTokenParams
 ): Promise<string> {
   try {
     const { refreshToken, clientId, clientSecret } = params;
 
     const response = await axios.post(
-      "https://oauth2.googleapis.com/token",
+      "https://www.googleapis.com/oauth2/v4/token",
       null,
       {
         params: {

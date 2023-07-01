@@ -6,7 +6,7 @@ import { categorizeEmailAi } from "./categorizeEmail";
 import { EmailModel } from "./email.model";
 import { getGmailMessages } from "./getGmailMessage";
 import { UserModel } from "./user.model";
-import { getAccessToken } from "./get-access-from-refresh-token";
+import { getAccessTokenFromRefreshToken } from "./get-access-from-refresh-token";
 
 const connectionString = process.env.MONGO_URI;
 
