@@ -33,6 +33,12 @@ const httpTrigger: AzureFunction = async function (
 
     const category = await categorizeEmail(emailData, context); // Function to categorize the email
 
+    if(!category) {
+      context.res = {
+        status: 200,
+        body: "This email lacks text body, it was not processed",
+      };
+    }
     // Store the email data in the database
     const newEmail = new EmailModel({
       email: emailAddress,
