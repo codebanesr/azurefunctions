@@ -7,6 +7,7 @@ interface Email {
   publishTime: Date;
   body?: string;
   category?: string;
+  emailBody: string;
 }
 
 const emailCategoryResponseSchema = new mongoose.Schema<EmailCategoryResponse>({
@@ -79,6 +80,7 @@ const EmailSchema = new mongoose.Schema<Email>({
     type: String,
   },
   category: emailCategoryResponseSchema,
+  emailBody: String,
 });
 
 // Create the Mongoose model

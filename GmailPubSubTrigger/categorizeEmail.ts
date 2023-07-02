@@ -1,5 +1,8 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
 import { EmailCategoryResponse } from "./oai.interface";
+import { gmail_v1 } from "googleapis";
+import { Context } from "vm";
+import { decode } from "js-base64";
 
 const apiUrl = process.env.OAI_URL;
 const apiKey = process.env.OAI_KEY;
@@ -16,6 +19,93 @@ async function sendRequest(
     console.error(error);
     throw error;
   }
+}
+
+// Function to categorize the email (modify this logic as per your categorization requirements)
+export async function categorizeEmail(
+  emailData: gmail_v1.Schema$Message,
+  context: Context
+) {
+  const { body, parts, mimeType } = emailData.payload || {};
+  let data = "";
+
+  if (mimeType === "text/html") {
+    context.res = {
+      status: 200,
+      body: "Cannot parse html content right now!",
+    };
+
+    return;
+  }
+
+  const logError = (message: string) => {
+    context.log.error(message);
+    // You can customize the error handling logic here
+  };
+
+  const mimeHandlers = {
+    "text/plain": (part: any) => {
+      try {
+        return decode(part.body.data);
+      } catch (error) {
+        logError("Error decoding text/plain part");
+        return "";
+      }
+    },
+    "text/html": (part: any) => {
+      try {
+        // will handle it later
+        return "";
+        // return decode(part.body.data);
+      } catch (error) {
+        logError("Error decoding text/html part");
+        return "";
+      }
+    },
+    "application/octet-stream": (part: any) => {
+      return decode(part.body.data.toString());
+    },
+  };
+
+  const processBody = (emailBody: any) => {
+    if (emailBody?.size > 0) {
+      try {
+        return decode(emailBody.data);
+      } catch (error) {
+        logError("Error decoding email body");
+        return "";
+      }
+    }
+    return "";
+  };
+
+  const processPart = (part: any) => {
+    const handler = mimeHandlers[part.mimeType];
+    if (handler) {
+      return handler(part);
+    } else {
+      // Handle other mime types if necessary
+      return "";
+    }
+  };
+
+  if (body.size > 0) {
+    data = processBody(body);
+  } else if (parts?.length > 0) {
+    for (const part of parts) {
+      data += processPart(part);
+    }
+  } else {
+    // Handle the case when both body and parts are missing or empty
+  }
+
+  console.log({ data: JSON.stringify(data, null, 2) });
+
+  if (!data) {
+    return;
+  }
+  const category = await categorizeEmailAi(data);
+  return { category, data };
 }
 
 export async function categorizeEmailAi(emailText: string) {
