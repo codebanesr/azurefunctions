@@ -1,10 +1,10 @@
 import { AzureFunction, Context, HttpRequest } from "@azure/functions";
 import mongoose from "mongoose";
 import { categorizeEmail } from "./categorizeEmail";
-import { EmailModel } from "./email.model";
 import { getAccessTokenFromRefreshToken } from "../utils/get-access-from-refresh-token";
 import { getGmailMessages } from "./getGmailMessage";
 import { UserModel } from "../utils/user.model";
+import { EmailModel } from "../utils/email.model";
 
 
 const httpTrigger: AzureFunction = async function (
