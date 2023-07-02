@@ -2,11 +2,10 @@ import { AzureFunction, Context, HttpRequest } from "@azure/functions";
 import mongoose from "mongoose";
 import { categorizeEmail } from "./categorizeEmail";
 import { EmailModel } from "./email.model";
-import { getAccessTokenFromRefreshToken } from "./get-access-from-refresh-token";
+import { getAccessTokenFromRefreshToken } from "../utils/get-access-from-refresh-token";
 import { getGmailMessages } from "./getGmailMessage";
-import { UserModel } from "./user.model";
+import { UserModel } from "../utils/user.model";
 
-const connectionString = process.env.MONGO_URI;
 
 const httpTrigger: AzureFunction = async function (
   context: Context,
@@ -14,7 +13,7 @@ const httpTrigger: AzureFunction = async function (
 ): Promise<void> {
   try {
     // Connect to MongoDB
-    await mongoose.connect(connectionString, {});
+    await mongoose.connect(process.env.MONGO_URI, {});
     console.log({ message: "Connected to mongodb" });
 
     // Extract email data from the request body

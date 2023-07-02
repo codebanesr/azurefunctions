@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
-import { EmailCategoryResponse } from "./oai.interface";
+import { EmailCategoryResponse } from "../utils/oai.interface";
 import { gmail_v1 } from "googleapis";
 import { Context } from "vm";
 import { decode } from "js-base64";
