@@ -1,15 +1,14 @@
 import axios from "axios";
-import { calendar_v3 } from "googleapis";
 
-export async function getPrimaryCalendar(accessToken: string) {
-  const response = await axios.get<calendar_v3.Calendar>(
-    `https://www.googleapis.com/calendar/v3/users/me/primary`,
+export async function getPrimaryCalendar(accessToken: string): Promise<string> {
+  const response = await axios.get(
+    `https://www.googleapis.com/calendar/v3/users/me/calendarList`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     }
   );
-  
-  return response.data;
+
+  return response.data.items[0].id;
 }

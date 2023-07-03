@@ -3,16 +3,16 @@ import axios from "axios";
 import { getAccessTokenFromEmail } from "./getAccessTokenFromEmail";
 import { getPrimaryCalendar } from "./getPrimaryCalendar";
 import { getCalendarEvents } from "./getCalendarEvents";
-
-const GOOGLE_CALENDAR_API_ENDPOINT = "https://www.googleapis.com/calendar/v3";
+import { calendar_v3 } from "googleapis";
 
 const httpTrigger: AzureFunction = async function (
   context: Context,
   req: HttpRequest
 ): Promise<void> {
   try {
-    const { date, time, duration, description, location, invitees } = req.body;
-
+    const { date, time, duration, description, location, invitees, email } =
+      req.body;
+    const timeZone = "America/Los_Angeles";
     if (!date) {
       context.res = {
         status: 400,
@@ -49,11 +49,14 @@ const httpTrigger: AzureFunction = async function (
 
     // Obtain the access token
     const accessToken = await getAccessToken(req);
-    const calendar = await getPrimaryCalendar(accessToken);
+
+    // const calendarId = await getPrimaryCalendar(accessToken); // this is the same as the user email
 
     const events = await getCalendarEvents(
       accessToken,
-      calendar.calendars[0].id
+      email,
+      startTime,
+      endTime
     );
 
     if (events.length === 0) {
@@ -68,6 +71,7 @@ const httpTrigger: AzureFunction = async function (
         emptySlot,
         parsedDuration,
         accessToken,
+        timeZone,
         time,
         description,
         location,
@@ -90,6 +94,7 @@ const httpTrigger: AzureFunction = async function (
         { end: availableSlots[0].start, start: availableSlots[0].end },
         parsedDuration,
         accessToken,
+        timeZone,
         time,
         description,
         location,
@@ -124,11 +129,12 @@ async function setMeeting(
   timeSlot: { start: string; end: string },
   duration: number,
   accessToken: string,
+  timeZone: string,
   time?: string,
   description?: string,
   location?: string,
   invitees?: string[]
-): Promise<void> {
+) {
   const meetingStart = time ? new Date(time) : new Date(timeSlot.start);
   const meetingEnd = new Date(meetingStart.getTime() + duration * 60 * 1000); // Meeting duration in minutes
 
@@ -137,16 +143,16 @@ async function setMeeting(
   // Replace with your own implementation
 
   // Example using Axios:
-  await axios.post(
-    `${GOOGLE_CALENDAR_API_ENDPOINT}/events`,
+  const response = await axios.post<calendar_v3.Schema$Event>(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
     {
       start: {
         dateTime: meetingStart.toISOString(),
-        timeZone: "America/Los_Angeles",
+        timeZone,
       },
       end: {
         dateTime: meetingEnd.toISOString(),
-        timeZone: "America/Los_Angeles",
+        timeZone,
       },
       description: description || "",
       location: location || "",
@@ -157,9 +163,12 @@ async function setMeeting(
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
     }
   );
+
+  return response.data;
 }
 
 function findAvailableTimeSlots(
