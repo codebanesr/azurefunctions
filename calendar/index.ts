@@ -1,5 +1,8 @@
 import { AzureFunction, Context, HttpRequest } from "@azure/functions";
 import axios from "axios";
+import { getAccessTokenFromEmail } from "./getAccessTokenFromEmail";
+import { getPrimaryCalendar } from "./getPrimaryCalendar";
+import { getCalendarEvents } from "./getCalendarEvents";
 
 const GOOGLE_CALENDAR_API_ENDPOINT = "https://www.googleapis.com/calendar/v3";
 
@@ -8,21 +11,19 @@ const httpTrigger: AzureFunction = async function (
   req: HttpRequest
 ): Promise<void> {
   try {
-    const dateParam = req.query.date; // Get the date from the query parameter
-    const timeParam = req.query.time; // Get the time from the query parameter (optional)
-    const durationParam = req.query.duration; // Get the duration from the query parameter (optional)
+    const { date, time, duration, description, location, invitees } = req.body;
 
-    if (!dateParam) {
+    if (!date) {
       context.res = {
         status: 400,
-        body: "Missing 'date' query parameter.",
+        body: "Missing 'date' field in the request body.",
       };
       return;
     }
 
-    const date = new Date(dateParam);
+    const parsedDate = new Date(date);
 
-    if (isNaN(date.getTime())) {
+    if (isNaN(parsedDate.getTime())) {
       context.res = {
         status: 400,
         body: "Invalid date format. Please provide a valid date.",
@@ -30,9 +31,9 @@ const httpTrigger: AzureFunction = async function (
       return;
     }
 
-    const duration = durationParam ? parseInt(durationParam) : 30; // Default duration is 30 minutes
+    const parsedDuration = duration ? parseInt(duration) : 30; // Default duration is 30 minutes
 
-    if (isNaN(duration) || duration <= 0) {
+    if (isNaN(parsedDuration) || parsedDuration <= 0) {
       context.res = {
         status: 400,
         body: "Invalid duration format. Please provide a valid positive integer duration in minutes.",
@@ -41,27 +42,19 @@ const httpTrigger: AzureFunction = async function (
     }
 
     // Define the start and end time for the day
-    const startTime = new Date(date);
+    const startTime = new Date(parsedDate);
     startTime.setHours(0, 0, 0, 0);
-    const endTime = new Date(date);
+    const endTime = new Date(parsedDate);
     endTime.setHours(23, 59, 59, 999);
 
     // Obtain the access token
     const accessToken = await getAccessToken(req);
+    const calendar = await getPrimaryCalendar(accessToken);
 
-    // Make a request to Google Calendar API to retrieve events for the given date
-    const response = await axios.get(`${GOOGLE_CALENDAR_API_ENDPOINT}/events`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      params: {
-        timeMin: startTime.toISOString(),
-        timeMax: endTime.toISOString(),
-        singleEvents: true,
-      },
-    });
-
-    const events = response.data.items || [];
+    const events = await getCalendarEvents(
+      accessToken,
+      calendar.calendars[0].id
+    );
 
     if (events.length === 0) {
       // No events for the given date, consider the whole day as an empty time slot
@@ -71,7 +64,15 @@ const httpTrigger: AzureFunction = async function (
       };
 
       // Set the meeting on the empty slot
-      await setMeeting(emptySlot, duration, accessToken, timeParam);
+      await setMeeting(
+        emptySlot,
+        parsedDuration,
+        accessToken,
+        time,
+        description,
+        location,
+        invitees
+      );
     } else {
       // Find the available time slots within the day
       const availableSlots = findAvailableTimeSlots(startTime, endTime, events);
@@ -87,8 +88,12 @@ const httpTrigger: AzureFunction = async function (
       // Set the meeting on the first available time slot
       await setMeeting(
         { end: availableSlots[0].start, start: availableSlots[0].end },
-        duration,
-        accessToken
+        parsedDuration,
+        accessToken,
+        time,
+        description,
+        location,
+        invitees
       );
     }
 
@@ -106,24 +111,25 @@ const httpTrigger: AzureFunction = async function (
 };
 
 async function getAccessToken(req: HttpRequest): Promise<string> {
-  const { email } = req.query;
+  const { email } = req.body;
 
   if (!email) {
-    throw new Error("Email is a must");
+    throw new Error("Email is required.");
   }
 
-  throw new Error("getAccessToken not implemented");
+  return getAccessTokenFromEmail(email);
 }
 
 async function setMeeting(
   timeSlot: { start: string; end: string },
   duration: number,
   accessToken: string,
-  timeParam?: string
+  time?: string,
+  description?: string,
+  location?: string,
+  invitees?: string[]
 ): Promise<void> {
-  const meetingStart = timeParam
-    ? new Date(timeParam)
-    : new Date(timeSlot.start);
+  const meetingStart = time ? new Date(time) : new Date(timeSlot.start);
   const meetingEnd = new Date(meetingStart.getTime() + duration * 60 * 1000); // Meeting duration in minutes
 
   // Logic to set the meeting using the obtained start and end times
@@ -131,16 +137,29 @@ async function setMeeting(
   // Replace with your own implementation
 
   // Example using Axios:
-  // await axios.post(`${GOOGLE_CALENDAR_API_ENDPOINT}/events`, {
-  //   start: { dateTime: meetingStart.toISOString() },
-  //   end: { dateTime: meetingEnd.toISOString() },
-  //   // Other event details
-  //   // ...
-  // }, {
-  //   headers: {
-  //     Authorization: `Bearer ${accessToken}`,
-  //   },
-  // });
+  await axios.post(
+    `${GOOGLE_CALENDAR_API_ENDPOINT}/events`,
+    {
+      start: {
+        dateTime: meetingStart.toISOString(),
+        timeZone: "America/Los_Angeles",
+      },
+      end: {
+        dateTime: meetingEnd.toISOString(),
+        timeZone: "America/Los_Angeles",
+      },
+      description: description || "",
+      location: location || "",
+      attendees: invitees ? invitees.map((email) => ({ email })) : undefined,
+      // Other event details
+      // ...
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 }
 
 function findAvailableTimeSlots(

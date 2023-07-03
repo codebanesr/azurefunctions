@@ -44,7 +44,14 @@ Please write an Azure Function code in Node.js that fulfills the requirements me
 Once you have implemented the Azure Function, you can test it using the following cURL command:
 
 ```bash
-curl -X GET "https://<YOUR_AZURE_FUNCTION_URL>?email=user@example.com&date=2023-07-04&time=10:30&duration=60"
+curl -X POST -H "Content-Type: application/json" -d '{
+  "date": "2023-07-04",
+  "time": "09:00:00",
+  "duration": "60",
+  "description": "Team Meeting",
+  "location": "Conference Room",
+  "invitees": ["john@example.com", "jane@example.com"]
+}' https://<your-azure-function-url>
 ```
 
 Replace `<YOUR_AZURE_FUNCTION_URL>` with the actual URL of your Azure Function. Adjust the `email`, `date`, `time`, and `duration` parameters as needed for your testing.
