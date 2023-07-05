@@ -135,8 +135,8 @@ export async function categorizeEmailAi(emailText: string) {
 
     const messages = [
       {
-        role: "system",
-        content: `Please extract the following information from the provided text and fill in the corresponding fields of this JSON schema, unsubscribe link is always relevant if it exists:
+        role: "user",
+        content: `Please parse the following text and return the information in the following JSON format:
         {
           "urgency": "Describe the urgency of the message [low, medium, high]",
           "is_meeting_required": "Specify whether a meeting is required [true, false]",
@@ -149,17 +149,15 @@ export async function categorizeEmailAi(emailText: string) {
           "follow_up_required": "Specify if a follow-up is required [true, false]",
           "cc": ["Enter cc_recipient1", "Enter cc_recipient2"],
           "bcc": ["Enter bcc_recipient1", "Enter bcc_recipient2"],
-          "relevant_links": ["Enter link1", "Enter link2"],
+          "relevant_links": Array of all links in the text, if unsubscribe link is present include it here too,
           "action_items": ["Enter action_item1", "Enter action_item2"],
           "language": "Enter the email language",
           "sender_name": "Enter the sender's name",
           "sender_email": "Enter the sender's email address"
-        }`,
-      },
-      {
-        role: "user",
-        content: emailText,
-      },
+        }
+        ---
+        text: ${emailText}`,
+      }
     ];
 
     const config: AxiosRequestConfig = {
